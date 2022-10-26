@@ -5,7 +5,7 @@
 \alias{alleleINF}
 \title{Allele info example data}
 \format{
-An object of class \code{data.frame} with 2857 rows and 25 columns.
+An object of class \code{data.frame} with 2857 rows and 28 columns.
 }
 \source{
 \href{https://zenodo.org/record/5025423#.Yj2XKRDMLyQ}{Chinook Salmon sequence reads McKinney et al. 2017}
@@ -24,7 +24,7 @@ with(alleleINF,plot(medRatio~propHet))
 \references{
 \itemize{
 \item{Larson, W. A., Seeb, L. W., Everett, M. V., Waples, R. K., Templin, W. D., & Seeb, J. E. (2014). Genotyping by sequencing resolves #' shallow population structure to inform conservation of Chinook salmon (Oncorhynchus tshawytscha). Evolutionary Applications, 7(3)}
-\item{McKinney, G. J., Waples, R. K., Seeb, L. W., & Seeb, J. E. (2017). Paralogs are revealed by proportion of heterozygotes and deviations in read ratios in genotypingbysequencing data from natural populations. Molecular Ecology Resources, 17(4)}
+\item{McKinney, G. J., Waples, R. K., Seeb, L. W., & Seeb, J. E. (2017). Paralogs are revealed by proportion of heterozygotes and deviations in read ratios in genotyping by sequencing data from natural populations. Molecular Ecology Resources, 17(4)}
 }
 }
 \keyword{datasets}

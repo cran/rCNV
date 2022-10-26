@@ -6,12 +6,13 @@
 \usage{
 cpm.normal(
   het.table,
-  method = c("TMM", "TMMex", "MedR", "QN"),
+  method = c("TMM", "TMMex", "MedR", "QN", "pca"),
   logratioTrim = 0.3,
   sumTrim = 0.05,
   Weighting = TRUE,
   Acutoff = -1e+10,
-  verbose = TRUE
+  verbose = TRUE,
+  plot = TRUE
 )
 }
 \arguments{
@@ -33,6 +34,8 @@ weights}
 (only for TMM(ex))}
 
 \item{verbose}{logical. show progress}
+
+\item{plot}{logical. Plot the boxplot of sample library sizes showing outliers}
 }
 \value{
 Returns a list with (AD), a data frame of normalized depth values
@@ -57,6 +60,9 @@ large data sets containing SNPs exceeding 10000
 \item The method \code{MedR} is median ratio normalization;
 \item QN - quantile normalization (see  Maza, Elie, et al. 2013 for a
 comparison of methods).
+\item PCA - a modified Kaiser's Rule applied to depth values: Sample variation
+of eigen values smaller than 0.7 are removed (i.e., the first eigen value < 0.7)
+to eliminate the effect of the library size of samples
 }
 }
 \examples{

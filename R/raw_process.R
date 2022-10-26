@@ -1,10 +1,12 @@
 # 1. wrapper for progressbar
+# adopted from https://ryouready.wordpress.com/2010/01/11/progress-bars-in-r-part-ii-a-wrapper-for-apply-functions/
+
 apply_pb <- function(X, MARGIN, FUN, ...)
 {
   env <- environment()
   pb_Total <- sum(dim(X)[MARGIN])
   counter <- 0
-  pb <- txtProgressBar(min = 0, max = pb_Total,
+  pb <- txtProgressBar(min = 0, max = pb_Total,width = 50,
                        style = 3)
 
   wrapper <- function(...)
@@ -25,7 +27,7 @@ lapply_pb <- function(X, FUN, ...)
   env <- environment()
   pb_Total <- length(X)
   counter <- 0
-  pb <- txtProgressBar(min = 0, max = pb_Total, style = 3)
+  pb <- txtProgressBar(min = 0, max = pb_Total, width = 50,style = 3)
 
   # wrapper around FUN
   wrapper <- function(...){
@@ -39,7 +41,6 @@ lapply_pb <- function(X, FUN, ...)
   res
 }
 
-#https://ryouready.wordpress.com/2010/01/11/progress-bars-in-r-part-ii-a-wrapper-for-apply-functions/
 
 combn_pb <- function(X, size, FUN, ...)
 {
@@ -48,7 +49,7 @@ combn_pb <- function(X, size, FUN, ...)
   r<-size
   pb_Total <- factorial(n)/(factorial(r)*factorial(n-r))
   counter <- 0
-  pb <- txtProgressBar(min = 0, max = pb_Total,
+  pb <- txtProgressBar(min = 0, max = pb_Total,width = 50,
                        style = 3)
 
   wrapper <- function(...)
@@ -63,6 +64,14 @@ combn_pb <- function(X, size, FUN, ...)
   close(pb)
   res
 }
+
+# for-loop progress bar
+# for(i in seq_along(xx)) {
+#   pb <- txtProgressBar(min = 0, max = length(xx), style = 3, width = 50, char = "=")
+#   setTxtProgressBar(pb, i)
+#   ### code
+# }
+# close(pb)
 
 
 #(extra) generate colors for Rmarkdown docs [extracted from Rmarkdown guide book]
@@ -182,10 +191,10 @@ readVCF <- function(vcf.file.path,verbose=FALSE){
 #' the table. Or keep only the CHROM, POS, ID, ALT, and individual AD columns.
 #' For info.type \code{GT} option is provided to extract the genotypes of
 #' individuals by snp.
-#' @return Returns a data frame of Allele Depth, Genotyp of SNPs for all the
+#' @return Returns a data frame of allele depth, genotype of SNPs for all the
 #' individuals extracted from a VCF file
 #'
-#' @author Piyal Karunarathne
+#' @author Piyal Karunarathne, Klaus Schliep
 #' @importFrom utils setTxtProgressBar txtProgressBar
 #' @examples
 #' vcf.file.path <- paste0(path.package("rCNV"), "/example.raw.vcf.gz")
@@ -193,7 +202,7 @@ readVCF <- function(vcf.file.path,verbose=FALSE){
 #' het.table<-hetTgen(vcf)
 #'
 #' @export
-hetTgen<-function(vcf,info.type=c("AD","AD-tot","GT","GT-012","GT-AB","DP"),verbose=TRUE){
+hetTgen <- function(vcf,info.type=c("AD","AD-tot","GT","GT-012","GT-AB","DP"),verbose=TRUE){
   if(inherits(vcf,"list")){vcf<-vcf$vcf}
   if(inherits(vcf,"data.frame")){vcf<-data.table::data.table(vcf)}
   if(any(nchar(vcf$ALT)>1)){
@@ -203,34 +212,38 @@ hetTgen<-function(vcf,info.type=c("AD","AD-tot","GT","GT-012","GT-AB","DP"),verb
 
   info.type<-match.arg(info.type)
   itype<-substr(info.type,1,2)
-  adn<-unname(unlist(lapply(unlist(vcf[,"FORMAT"]),function(i){which(strsplit(i,":")[[1]]==itype)})))
-  xx<-data.frame(as.numeric(adn),vcf[,-c(1:9)])
 
-  if(verbose) {
-    if(itype=="AD"){message("generating allele depth table")
-      h.table<-t(apply_pb(xx,1,function(X){do.call(cbind,lapply(X,function(x){paste(strsplit(x, ":")[[1]][as.numeric(X[1])], collapse = ':')}))}))
-    } else if(itype=="GT"){message("generating genotypes table")
-      h.table<-t(apply_pb(xx,1,function(X){do.call(cbind,lapply(X,function(x){paste(strsplit(x, ":")[[1]][as.numeric(X[1])], collapse = ':')}))}))
-    }
-    else if(itype=="DP"){message("generating unfiltered allele depth table")
-      h.table<-t(apply_pb(xx,1,function(X){do.call(cbind,lapply(X,function(x){paste(strsplit(x, ":")[[1]][as.numeric(X[1])], collapse = ':')}))}))}
-  } else {
-    if(itype=="AD"){h.table<-t(apply(xx,1,function(X){do.call(cbind,lapply(X,function(x){paste(strsplit(x, ":")[[1]][as.numeric(X[1])], collapse = ':')}))}))}
-    else if(itype=="DP"){h.table<-t(apply(xx,1,function(X){do.call(cbind,lapply(X,function(x){paste(strsplit(x, ":")[[1]][as.numeric(X[1])], collapse = ':')}))}))}
-    else if(itype=="GT"){h.table<-t(apply(xx,1,function(X){do.call(cbind,lapply(X,function(x){paste(strsplit(x, ":")[[1]][as.numeric(X[1])], collapse = ':')}))}))}
-  }
-  h.table<-h.table[,-1]
-
-  if(info.type!="DP"){h.table[is.na(h.table) | h.table==".,."]<-"./."}
+  adn <- sapply(strsplit(unlist(vcf[,"FORMAT"], use.names = FALSE),":"), function(x)match(itype, x))
+  max_adn <- max(adn) + 1L
+  ind <- cbind(seq_along(adn), adn)
+  xx<-data.frame(vcf[,-c(1:9)])
 
   if(info.type=="AD-tot"){
-    if(verbose){
-      message("generating total depth values")
-      h.table<-apply_pb(h.table,2,function(x){do.call(cbind,lapply(x,function(y){sum(as.numeric(unlist(strsplit(as.character(y),","))))}))})
-    } else {
-      h.table<-apply(h.table,2,function(x){do.call(cbind,lapply(x,function(y){sum(as.numeric(unlist(strsplit(as.character(y),","))))}))})
+    h.table <- matrix(NA_integer_, nrow(xx), ncol(xx))
+    if(verbose) message("generating total depth values")
+    for(i in seq_len(ncol(xx))){
+      if(verbose){
+        pb <- txtProgressBar(min = 0, max = ncol(xx), style = 3, width = 50, char = "=")
+        setTxtProgressBar(pb, i)
+      }
+      tmp <- stringr::str_split_fixed(xx[,i], ":", max_adn)[ind]
+      tmp <- stringr::str_split_fixed(tmp, ",", 2L)
+      h.table[, i] <- as.numeric(tmp[,1]) + as.numeric(tmp[,2]) ## as.integer???
     }
   }
+  else {
+    h.table <- matrix(NA_character_, nrow(xx), ncol(xx))
+    if(verbose) message("generating table")
+    for(i in seq_len(ncol(xx))){
+      if(verbose){
+        pb <- txtProgressBar(min = 0, max = ncol(xx), style = 3, width = 50, char = "=")
+        setTxtProgressBar(pb, i)
+      }
+      h.table[, i] <- stringr::str_split_fixed(xx[,i], ":", max_adn)[ind]
+    }
+    if(info.type!="DP"){h.table[is.na(h.table) | h.table==".,."]<-"./."}
+  }
+if(verbose) {close(pb)}
   if(info.type=="GT-012"){
     h.table[h.table=="0/0"]<-0
     h.table[h.table=="1/1"]<-1
@@ -241,7 +254,7 @@ hetTgen<-function(vcf,info.type=c("AD","AD-tot","GT","GT-012","GT-AB","DP"),verb
     h.table[h.table=="0/0"]<-"AA"
     h.table[h.table=="1/1"]<-"BB"
     h.table[h.table=="1/0" | h.table=="0/1"] <- "AB"
-    h.table[h.table=="./."| h.table=="."]<--9
+    h.table[h.table=="./."| h.table=="."]<- -9
   }
   if(info.type=="AD" ){
     h.table[h.table=="./." | h.table=="." | is.na(h.table)]<-"0,0"
@@ -254,7 +267,6 @@ hetTgen<-function(vcf,info.type=c("AD","AD-tot","GT","GT-012","GT-AB","DP"),verb
   colnames(het.table)<-c("CHROM",colnames(vcf)[c(2,3,5,10:ncol(vcf))])
   return(het.table)
 }
-
 
 #' Get missingness of individuals in raw vcf
 #'
@@ -311,10 +323,11 @@ get.miss<-function(data,type=c("samples","snps"),plot=TRUE,verbose=TRUE){
     on.exit(par(opars))
 
     if(length(type)==2){par(mfrow=c(1,2))}
+    cl<-makeTransparent(c(1,2),alpha = 0.6)
     #missing samples
     if(any(type=="samples")){
       plot(density(ll$f_miss),type="n",main="Missing % per sample", xlim = c(0,1))
-      polygon(density(ll$f_miss),border="red",col="lightblue")
+      polygon(density(ll$f_miss),border=2,col=cl[1])
       abline(v=quantile(ll$f_miss,p=0.95),lty=3,col="blue")
       text(x=quantile(ll$f_miss,p=0.95)+0.02,y=max(density(ll$f_miss)$y)/2,round(quantile(ll$f_miss,p=0.95),3),offset=10,col=2)
       legend("topright",lty=3,col="blue",legend="95% quantile",bty="n",cex=0.8)
@@ -322,7 +335,7 @@ get.miss<-function(data,type=c("samples","snps"),plot=TRUE,verbose=TRUE){
     #missing snps
     if(any(type=="snps")){
       plot(density(L$f_miss),type="n",main="Missing % per SNP", xlim = c(0,1))
-      polygon(density(L$f_miss),border="red",col="lightblue")
+      polygon(density(L$f_miss),border=2,col=cl[1])
       abline(v=quantile(L$f_miss,p=0.95),lty=3,col="blue")
       text(x=quantile(L$f_miss,p=0.95)+0.02,y=max(density(L$f_miss)$y)/2,round(quantile(L$f_miss,p=0.95),3),offset=10,col=2)
       legend("topright",lty=3,col="blue",legend="95% quantile",bty="n",cex=0.8)
@@ -346,13 +359,14 @@ get.miss<-function(data,type=c("samples","snps"),plot=TRUE,verbose=TRUE){
 #' file generated from VCFTools
 #' @param info a data frame containing sample and population information.
 #' It must have \dQuote{sample} and \dQuote{population} columns
-#' @param snp.subset logical. whether to generate a randomly sampled tenfold
+#' @param format character. output format i.e., for BayPass or BayEnv
+#' @param snp.subset numerical. number of randomly selected subsets of SNPs.
+#' \code{default = NULL}
 #' subset
-#' @param verbose logical. If \code{TRUE} shows progress
 #'
-#' @return Returns a list with formatted genotype data: \code{$hor} - snps
-#' in horizontal format (two lines per snp); \code{$ver} - vertical format
-#' (two column per snp); \code{$hor.chunk} - a subset snps of \code{$hor}
+#' @return Returns a list with formatted genotype data: \code{$bayenv} - snps
+#' in horizontal format - for BayEnv (two lines per snp); \code{$baypass} - vertical format - for BayPass
+#' (two column per snp); \code{$sub.bp} - subsets snps for BayPass \code{$sub.be} - subsets of snps for BayEnv
 #'
 #' @author Piyal Karunarathne
 #'
@@ -364,61 +378,68 @@ get.miss<-function(data,type=c("samples","snps"),plot=TRUE,verbose=TRUE){
 #' GT<-gt.format(het.table,info)}
 #'
 #' @export
-gt.format <- function(gt,info,snp.subset=FALSE,verbose=FALSE) {
+gt.format <- function(gt,info,format=c("benv","bpass"),snp.subset=NULL) {
   if(is.character(gt)){
     gt <-as.data.frame(fread(gt))
     gts <-gt[,-c(1,2)]
   } else {
-    gts<-gt[,-c(1,2)]
+    gts<-gt[,-c(1:4)]
   }
   if(is.character(info)){
-    pop.col<-NULL
-    for(i in seq_along(info)){
-      pop.col[grep(info[i],colnames(gts))]<-info[i]
+    if(length(info)==ncol(gts)){
+      info<-data.frame(population=info)
+    } else {
+      pop.col<-NULL
+      for(i in seq_along(info)){
+        pop.col[grep(info[i],colnames(gts))]<-info[i]
+      }
+      info<-data.frame(population=pop.col)
     }
-    info<-data.frame(population=pop.col)
   }
   rownames(gts)<-paste(gt$CHROM,gt$POS,sep=".")
   pp<-na.omit(unique(info$population))
-
   infos<-as.character(info$population)
- if(verbose){
-   pgt.h<-lapply_pb(pp,function(x,gts,info){
-     tm <- as.data.frame(gts[,which(info==x)])
-     gtt <- lapply(1:nrow(tm),function(y,tm){gg(as.character(tm[y,]))},tm=tm)
-     gf <- t(do.call(cbind,gtt))
-     colnames(gf)<-x
-     return(gf)
-   },gts=gts,info=infos)
- } else {
-   pgt.h<-lapply(pp,function(x,gts,info){
-     tm <- as.data.frame(gts[,which(info==x)])
-     gtt <- lapply(1:nrow(tm),function(y,tm){gg(as.character(tm[y,]))},tm=tm)
-     gf <- t(do.call(cbind,gtt))
-     colnames(gf)<-x
-     return(gf)
-   },gts=gts,info=infos)
- }
-  pgt.h<-do.call(cbind,pgt.h)
-  nm <- unlist(lapply(rownames(gts),FUN=function(x)c(paste0(x,"~1"),paste0(x,"~2"))))
-  rownames(pgt.h)<-nm
-  pgt.h <- as.matrix(pgt.h)
-  pgt.h[which(is.na(pgt.h))] <- 0
-  if(snp.subset){
-    message("subsetting")
-    rn<-sample(1:10,nrow(gts),replace = T)
-    snps<-rownames(gts)
-    chu<-lapply_pb(1:10,function(nn,pgt.h,snps,rn){
-      sset<-snps[rn==nn]
-      tmp0<-NULL
-      for(k in seq_along(sset)){
-        tmp<-pgt.h[grep(sset[k],rownames(pgt.h)),]
-        tmp0<-rbind(tmp0,tmp)
-      }
-      return(tmp0)
-    },pgt.h=pgt.h,snps=snps,rn=rn)
-  } else { chu <- NULL}
-  return(list(hor=pgt.h,ver=t(pgt.h),subsets=chu,pop=as.character(pp)))
+  format<-match.arg(format,several.ok = TRUE)
+
+  lgt<-split.data.frame(t(gts),f=info$population)
+
+  if(any(format=="benv")){
+    message("Formating BayEnv")
+    ppe<-lapply_pb(lgt,function(X){
+      out<-apply(X,2,function(x){zero<-sum((unlist(stringr::str_split(x,"/||")))==0)
+      one<-sum((unlist(stringr::str_split(x,"/||")))==1)
+      ot<-as.data.frame(c(zero,one),col.names=F)
+      return(ot)},simplify = F)
+      out<-do.call(rbind,out)
+      colnames(out)<-NULL
+      return(out)
+    })
+    ppe<-do.call(cbind,ppe)
+    rownames(ppe)<-paste0(paste0(gt[,1],".",gt[,2]),"~",rep(c(1,2),nrow(gt)))
+  } else {ppe<-NULL}
+
+  if(any(format=="bpass")){
+    message("Formating BayPass")
+    ppp<-lapply_pb(lgt,function(X){
+      out<-apply(X,2,function(x){zero<-sum((unlist(stringr::str_split(x,"/||")))==0)
+      one<-sum((unlist(stringr::str_split(x,"/||")))==1)
+      ot<-c(zero,one)
+      return(ot)},simplify = F)
+      out<-do.call(rbind,out)
+      colnames(out)<-NULL
+      return(out)
+    })
+    ppp<-do.call(cbind,ppp)
+    colnames(ppp)<-paste0(rep(names(lgt),each=2),"~",rep(c(1,2),ncol(ppp)/2))
+    rownames(ppp)<-paste0(gt[,1],".",gt[,2])
+
+    if(!is.null(snp.subset)){
+      rn<-sample(1:snp.subset,nrow(gts),replace = T)
+      rownames(gts)<-paste0(gt[,1],".",gt[,2])
+      chu.p<-split.data.frame(ppp,f=rn)
+    } else { chu.p <- NULL}
+  } else {ppp<-NULL}
+  return(list(baypass=ppp,bayenv=ppe,sub.bp=chu.p,pop=as.character(pp)))
 }
 
 
@@ -488,14 +509,16 @@ ad.correct<-function(het.table,gt.table=NULL,odd.correct=TRUE,verbose=TRUE){
    if(verbose){
      message("correcting odd number anomalies")
      vv<-apply_pb(X,2,function(sam){
-       dl<-lapply(sam,function(y){
-         l<-as.numeric(unlist(strsplit(y,",")))
-         if((sum(l,na.rm=TRUE)%%2)!=0){
-           if(any(l==0)){l}else{
-             l[which.min(l)]<-l[which.min(l)]+1}
-         }
-         return(paste0(l,collapse = ","))
-       })
+       sam<-unname(unlist(sam))
+       tmp <- stringr::str_split_fixed(sam, ",", 2L)
+       tmp<-cbind(as.integer(tmp[,1]),as.integer(tmp[,2]))
+       tch<-which((rowSums(tmp,na.rm=TRUE)%%2)!=0)
+       for(i in tch){
+         tm<-tmp[i,]
+         if(any(tm==0)){tm[which.max(tm)]<-tm[which.max(tm)]+1L}else{tm[which.min(tm)]<-tm[which.min(tm)]+1L}
+         tmp[i,]<-tm
+       }
+       return(paste0(tmp[,1],",",tmp[,2]))
      })
      if(inherits(vv,"list")){
        vv<-do.call(cbind,vv)

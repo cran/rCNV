@@ -6,7 +6,7 @@
 \usage{
 sig.hets(
   a.info,
-  method = c("fisher", "chi.sq"),
+  method = c("chi.sq", "fisher"),
   plot = TRUE,
   verbose = TRUE,
   ...
@@ -14,7 +14,7 @@ sig.hets(
 }
 \arguments{
 \item{a.info}{allele info table generated from filtered vcfs using the
-function \code{allele.info}}
+function \code{allele.info} or allele depth table generated from \code{hetTgen}}
 
 \item{method}{character. Method for testing significance. Fisher exact test
 (\code{fisher}) or Chi-square test (\code{chi.sq})}
@@ -32,8 +32,8 @@ data with p-value indicating significance of deviation.
 }
 \description{
 This function will recognize the SNPs with a proportion of heterozygotes
-significantly higher than expected under HWE and plot putatively
-duplicated snps
+significantly higher than expected under HWE and plot deviant snps based
+only on the excess of heterozygotes.
 }
 \examples{
 \dontrun{data(alleleINF)
@@ -42,5 +42,5 @@ duplicates<-sig.hets(AI,plot=TRUE)}
 
 }
 \author{
-Piyal Karunarathne, Pascal Milesi
+Piyal Karunarathne, Pascal Milesi, Klaus Schliep
 }

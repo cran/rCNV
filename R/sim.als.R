@@ -4,24 +4,35 @@ sim<-function(x,nrun,n){y<-replicate(nrun,{tt<-sample(x,n,replace=F);c(sum(tt==0
 c(rowMeans(y),apply(y,1,sd),apply(y,1,function(x)quantile(x,p=0.95,na.rm=T)),
   apply(y,1,function(x)quantile(x,p=0.05,na.rm=T)),apply(y,1,function(x)quantile(x,p=0.975,na.rm=T)),
   apply(y,1,function(x)quantile(x,p=0.025,na.rm=T)))}
+
 #2. generate median allele ratios for a given number of samples for one depth value
-dp.cov<-function(cov.i,nsamp){
-  if(cov.i==0){return(rep(NA,length(nsamp)))}
-  if(cov.i==1){return(rep(1,length(nsamp)))} else {
-    unlist(lapply(nsamp,function(z,cov.i){
-      reads<-replicate(z,rbinom(cov.i,1,prob=0.5))
-      tt<-apply(reads,2,table)
-      if(is.list(tt)){
-        md<-median(do.call(cbind,tt)[1,]/cov.i)
-      } else if(is.matrix(tt)){
-        md<- median(proportions(apply(reads,2,table),2)[1,],na.rm = T)
-      } else {
-        md<-NA
-      }
-      return(md)
-    },cov.i))
-  }
+dp.cov<-function(depth,sam,sims){
+  dout<-lapply(sam,function(x,depth,sims){y<-replicate(n=sims,{
+    Allele1<-rbinom(n = x,size = depth,prob=0.5) # Binomial sampling of number of reads supporting Allele 1
+    Dev<- ((depth/2) - Allele1) / depth # deviation from expectation of 0.5
+    Devsum<-abs(mean((Dev)))
+  });return(mean(abs(y)))},depth=depth,sims=sims)
+  dout<-simplify2array(dout)
+  return(dout)
 }
+
+#2. generate Z-score confidence for allele ratios for a given number of samples for one depth value
+dp.covZ<-function(nsamp,bias,depth,sims,p){
+  dout<-lapply(bias,function(y,nsamp,depth,sims,p){rp<-replicate(n=sims,{
+    Allele1<-rbinom(n = nsamp,size = depth,prob=y)
+    Zscore<- ((depth*p) - Allele1) / sqrt(depth*p*(1-p))
+    Zsum<-sum(Zscore)
+    pval<-pnorm(q = Zsum, mean = 0, sd = sqrt(nsamp),lower.tail = F)
+  })
+  tmp<-length(which(rp <= 0.05))/sims
+  return(tmp)
+  },depth=depth,sims=sims,nsamp=nsamp,p=p) #;return(length(which(rp <= 0.05))/sims)
+  dout<-simplify2array(dout)
+  dout<-cbind(nsamp,bias,dout)
+  dout<-dout[which(dout[,3]>=0.95),]
+  return(dout)
+}
+
 #3 make a given vector of colors transparent to a desired opacity
 makeTransparent = function(..., alpha=0.5) {
   if(alpha<0 | alpha>1) stop("alpha must be between 0 and 1")
@@ -35,33 +46,30 @@ makeTransparent = function(..., alpha=0.5) {
 }
 
 #5 plot depth vs samples
-plot.svd <- function(MR,cols=c("red","cyan")){
+plot.svd <- function(MR,cols=c("#1C86EE", "#00BFFF", "#DAA520", "#FF0000")){
   opars<-par(no.readonly = TRUE)
   on.exit(par(opars))
-  colfunc <- colorRampPalette(cols)
-  cols<-makeTransparent(colfunc(10),alpha = 0.7)
-  MR2 <- MR
-  MR2[which(MR2>0.5)]<-1-MR2[which(MR2>0.5)]
-  qtt <-quantile(MR2,p=0.05,na.rm = T)
-  qtt1 <- quantile(MR2,p=0.01,na.rm = T)
-  mn <- mean(MR2,na.rm = T)
-  md <- median(MR2,na.rm = T)
-  MR3 <- MR2
-  MR3[which(MR2>=md)]<-cols[10]
-  MR3[which(MR2<md)]<-cols[10]
-  MR3[which(MR2<mn) ]<-cols[9]
-  MR3[which(MR2<qtt) ]<-cols[2]
-  MR3[which(MR2<=qtt1)]<-cols[1]
-  mat<-apply(t(MR3),2,rev)#rotate matrix -90
+  MR<-MR[-1,-1]
+  colfunc <- colorRampPalette(cols,bias=ifelse(any(dim(MR))>30,.2,1))
+  qt<-quantile(MR,na.rm = T,p=seq(.1,1,ifelse(length(MR)<10000,1/length(MR),0.0001)))
+  qt<-c(-Inf,qt,Inf)
+  cl<-colfunc(length(qt))
+  tcl<-cl[cut(MR,breaks=qt)]
+  #tcl[is.na(tcl)]<-cl[1]
+  mat<-matrix(tcl,nrow=nrow(MR),ncol=ncol(MR))
+  mat<-apply(t(mat),2,rev)
   ld <- as.raster(mat,nrow=nrow(mat))
-  legend_image <- as.raster(matrix(rev(cols), ncol=1))
+  colfunc <- colorRampPalette(cols)
+  cl<-colfunc(length(qt))
+  legend_image <- as.raster(matrix(rev(cl), ncol=1))
   layout(matrix(1:2,ncol=2), widths = c(3,1),heights = c(1,1))
   par(mar=c(4,4,3,0))
-  plot(0,type="n",xlim = range(range(as.numeric(rownames(MR)))),ylim=range(range(as.numeric(colnames(MR)))),xlab="Number of samples",ylab="Median depth coverage",frame=F)
-  rasterImage(ld,0,0,1000,200)
+  plot(0,type="n",xlim = range(as.numeric(colnames(MR))),ylim=range(as.numeric(rownames(MR))),xlab="Number of samples",ylab="Median depth coverage",frame=F)
+  rasterImage(ld,2,2,range(as.numeric(colnames(MR)))[2],range(as.numeric(rownames(MR)))[2])
   par(mar=c(3,0.5,7,1))
-  plot(c(0,2),c(0,1),type = 'n', axes = F,xlab = '', ylab = '')#, main = 'legend title'
-  text(x=0.9, y = c(0.1,1), labels = c("low confidence","high confidence"),cex=0.6)
+  plot(c(0,2),c(0,1.3),type = 'n', axes = F,xlab = '', ylab = '')#, main = 'legend title'
+  text(x=0.6,y=1.1,labels = 'Deviation from 0.5',cex=0.7,font=2)
+  text(x=0.5, y = c(0.1,1), labels = c("Low","High"),cex=0.7)
   rasterImage(legend_image, 0, 0.1, 0.2,1)
 }
 
@@ -122,7 +130,7 @@ sim.als<-function(n=500,nrun=10000,res=0.001,plot=TRUE){
 }
 
 
-#' Simulate median allele ratios for varying no. of samples and depth coverage
+#' Simulate median allele ratios for varying number of samples and depth values
 #'
 #' This function will simulate the expected median allele ratios under HWE
 #' for given ranges of no. of samples and depth coverage values.
@@ -131,11 +139,11 @@ sim.als<-function(n=500,nrun=10000,res=0.001,plot=TRUE){
 #'
 #' @param cov.len max value of depth of coverage to be simulated
 #' @param sam.len maximum no. of samples to be simulated
-#' @param incr a vector of two integers indicating increment size for both
+#' @param nsims numerical. no. of simulations to be done for each combination of samples and depth
 #' depth and no. samples ranges
 #' @param plot logical. Whether to plot the output (a plot of no. samples
 #' vs median depth of coverage colored by median allele ratios)
-#' @param plot.cols character. Two colors to add to the gradient
+#' @param col character. Two colors to add to the gradient
 #'
 #' @return A matrix of median allele ratios where rows are the number of
 #' samples and columns are depth of coverage values
@@ -143,69 +151,82 @@ sim.als<-function(n=500,nrun=10000,res=0.001,plot=TRUE){
 #' @author Pascal Milesi, Piyal Karunarathne
 #'
 #' @examples
-#' \dontrun{depthVsSample(cov.len=50,sam.len=100)}
+#' \dontrun{depthVsSample(cov.len=100,sam.len=100)}
 #'
 #' @importFrom stats fisher.test median quantile rbinom sd smooth.spline
 #' @importFrom grDevices as.raster colorRampPalette
 #' @importFrom graphics layout par rasterImage text
 #' @export
-depthVsSample<-function(cov.len=400,sam.len=1000,incr=c(1,1),plot=TRUE,plot.cols=c("red","cyan")){
-  cov<- seq(1,cov.len,incr[1])
-  nsamp<- seq(1,sam.len,incr[2])
-  MR<-lapply_pb(cov,function(x,nsamp){
-    tmp<-dp.cov(cov.i=x,nsamp)
-    return(tmp)
-  },nsamp=nsamp)
-  MR<-do.call(cbind,MR)
-  colnames(MR)<-cov
-  rownames(MR)<-nsamp
+depthVsSample<-function(cov.len=100,sam.len=100,nsims=1000,plot=TRUE,col=c("#1C86EE","#00BFFF","#DAA520","#FF0000")){
+  sims<-nsims
+  rdepth<-seq(2,cov.len,by=1)
+  nsamp<-seq(2,sam.len,by=1)
+  alsim<-matrix(NA,nrow=cov.len,ncol=sam.len)
+
+  for(i in seq_along(rdepth)){
+    pb <- txtProgressBar(min = 0, max = length(rdepth), style = 3, width = 50, char = "=")
+    setTxtProgressBar(pb, i)
+    tm<-dp.cov(depth=rdepth[i],sam=nsamp,sims=sims)
+    alsim[i+1,]<-c(NA,tm)
+  }
+  close(pb)
+  colnames(alsim)<-1:sam.len
+  rownames(alsim)<-1:cov.len
+
   if(plot){
-    plot.svd(MR,cols=plot.cols)
+    plot.svd(MR=alsim,cols = col)
   }
-  return(MR)
-  #saveRDS(MR,paste0(dirout,"/sim_SampVsDepth_",i,".rds"),compress = "gzip")
+  return(alsim)
 }
 
-#'
-#' @noRd
-#'
 
-foo<-function(z,cov.i){
-  reads<-replicate(z,rbinom(cov.i,1,prob=0.5))
-  #tt<-apply(reads,2,function(x)sum(x==0)/length(x))
-  tt<-apply(reads,2,function(x)((length(x)/2)-sum(x==1))/(sqrt(length(x)*.25)))
-    return(tt)
-}
-
-dp.cov2<-function(cov.i,nsamp){
-  if(cov.i==0){return(matrix(NA,nrow=length(nsamp),ncol = 5))}
-  if(cov.i==1){return(matrix(1,nrow=length(nsamp),ncol = 5))} else {
-    tl<-lapply(nsamp,function(z,cov.i){
-      mat<-t(replicate(10000,foo(z,cov.i)))
-      q95<-median(apply(mat,1,quantile,p=.995))
-      q05<-median(apply(mat,1,quantile,p=.025))
-      mx<-median(apply(mat,1,max))
-      mm<-median(apply(mat,1,median))
-      mn<-median(apply(mat,1,min))
-      return(c(mx,mn,mm,q95,q05))
-    },cov.i)
-    tl<-do.call(rbind,tl)
-    colnames(tl)<-c("max","min","med","q95","q05")
-    rownames(tl)<-nsamp
-    return(tl)
+#' Simulate and plot detection power of bias in allele ratios
+#'
+#' This function simulates 95% confidence level Z-score based detection power
+#' of allele biases for a given number of samples and a range of depths
+#'
+#' @param Dlist numerical. vector of depths values to be tested
+#' @param sam numerical. number of samples
+#' @param intensity numerical. frequency of bias
+#' @param nsims numerical. number of simulations to be done for each sample
+#' @param p numerical. expected allele ratio (0.5 for data with known
+#' sequencing biases)
+#' @param plot logical. plot the output
+#'
+#' @return Returns a list of detection probability values for the given range of
+#' samples and depth
+#'
+#' @author Pascal Milesi, Piyal Karunarathne
+#'
+#' @importFrom grDevices hcl.colors
+#'
+#' @export
+power.bias<-function(Dlist=c(2,4,8,16),sam=100,intensity=0.005,nsims=1000,p=0.5,plot=TRUE){
+  bias<-seq(0,0.5,intensity)
+  sims=nsims
+  d<-list()
+  for(i in seq_along(Dlist)){
+    pb <- txtProgressBar(min = 0, max = length(Dlist), style = 3, width = 50, char = "=")
+    setTxtProgressBar(pb, i)
+    depth=Dlist[i]
+    saml<-lapply(1:sam,FUN=dp.covZ,bias=bias,depth=depth,sims=sims,p=p)
+    saml<-do.call(rbind,saml)
+    d[[i]]<-saml[,-3]
   }
+  close(pb)
+  names(d)<-Dlist
+  if(plot){
+    cl<-hcl.colors(length(Dlist),"dark 3")
+    plot(c(0,0.5)~c(0,sam),typ="n",ylab = "Simutlated Allele Ratio",xlab = "Number of heterozygotes", main=paste0("Detection power of bias in allele ratio \n for the expected ratio of ",p))
+    for(j in seq_along(Dlist)){
+      sub<-unlist(by(d[[j]][,2],d[[j]][,1],max,simplify = F))
+      lines(smooth.spline(sub~as.numeric(names(sub)),df=20),lwd = 2,col=cl[j])
+    }
+    legend("bottomright",legend = Dlist,lwd=2,col=cl[1:length(Dlist)],title = "Depth",bty="n",cex=.8)
+  }
+  return(d)
 }
 
 
-depthVsSample2<-function(cov.len=400,sam.len=1000,incr=c(1,1)){
-  cov<- seq(1,cov.len,incr[1])
-  nsamp<- seq(1,sam.len,incr[2])
-  MR<-lapply_pb(cov,function(x,nsamp){
-    tmp<-dp.cov2(cov.i=x,nsamp)
-    return(tmp)
-  },nsamp=nsamp)
-  names(MR)<-cov
-  return(MR)
-}
 
 

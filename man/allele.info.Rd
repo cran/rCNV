@@ -7,7 +7,7 @@
 allele.info(
   X,
   x.norm = NULL,
-  method = c("TMM", "TMMex"),
+  method = c("TMM", "TMMex", "MedR", "QN", "pca"),
   logratioTrim = 0.3,
   sumTrim = 0.05,
   Weighting = TRUE,
@@ -60,7 +60,7 @@ Allele information generated here are individual SNP based and presents the
 proportion of heterozygotes, number of samples, and deviation of allele
 detection from a 1:1 ratio of reference and alternative alleles.
 The significance of the deviation is tested with Z-score test
-\eqn{Z =\frac{\frac{N}{2}-N_{A}}{\sigma_{x}}},
+\eqn{Z = \frac{ \frac{N}{2}-N_A}{ \sigma_{x}}},
 and chi-square test (see references for more details on the method).
 }
 \examples{
@@ -78,5 +78,5 @@ Molecular Ecology Resources, 17(4)}
 }
 }
 \author{
-Piyal Karunarathne, Pascal Milesi, Qiujie Zhou
+Piyal Karunarathne, Pascal Milesi, Klaus Schliep
 }

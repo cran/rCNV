@@ -9,15 +9,14 @@
 ##    O = NF + (1-F)E
 ## Which rearranges to give
 ##    F = (O-E)/(N-E)
-
-het.sity<-function(ind){
-  O<-length(which(ind=="0/0"))+length(which(ind=="1/1"))
-  N<-length(which(ind=="0/0"))+length(which(ind=="1/1"))+length(which(ind=="0/1"))+length(which(ind=="1/0"))
-  alle<-unname(unlist(lapply(ind,strsplit,split="/")))
-  p<-length(which(alle=="0"))/(length(which(alle=="0"))+length(which(alle=="1")))
-  q<-length(which(alle=="1"))/(length(which(alle=="0"))+length(which(alle=="1")))
-  E<-(p^2+q^2)*N
-  FF<-(O-E)/(N-E)
+het.sity <- function(ind){
+  tab <- table(factor(ind, levels=c("0/0", "1/1", "1/0", "0/1", "./.", ".")))
+  O <- tab["0/0"] + tab["1/1"]
+  N <- tab["0/0"] + tab["1/1"] + tab["0/1"] + tab["1/0"]
+  p <- (2 * tab["0/0"] + tab["0/1"] + tab["1/0"])/ (2*N)
+  q <- 1 - p
+  E <-(p^2+q^2)*N
+  FF <-(O-E)/(N-E)
   return(c(O,E,N,FF))
 }
 
@@ -65,7 +64,7 @@ return(V)}
 #' @return Returns a data frame of expected \dQuote{E(Hom)} and observed
 #' \dQuote{O(Hom)} homozygotes with their inbreeding coefficients.
 #'
-#' @author Piyal Karunarathne, Pascal Milesi
+#' @author Piyal Karunarathne, Pascal Milesi, Klaus Schliep
 #'
 #' @examples
 #' \dontrun{vcf.file.path <- paste0(path.package("rCNV"), "/example.raw.vcf.gz")
@@ -84,9 +83,9 @@ h.zygosity<-function(vcf,plot=FALSE,pops=NA,verbose=TRUE){
   }
   if(verbose){
     message("assessing per sample homozygosity")
-    hh<-t(apply_pb(gtt[,-c(1:3)],2,het.sity))
+    hh<-t(apply_pb(gtt[,-c(1:4)],2,het.sity))
   } else {
-    hh<-t(apply(gtt[,-c(1:3)],2,het.sity))
+    hh<-t(apply(gtt[,-c(1:4)],2,het.sity))
   }
   hh<-data.frame(rownames(hh),hh)
   colnames(hh)<-c("ind","O(Hom)","E(Hom)","total","Fis")
@@ -149,7 +148,7 @@ relatedness<-function(vcf,plot=TRUE,threshold=0.5,verbose=TRUE){
     vcf<-vcf$vcf
     gtt<-hetTgen(vcf,"GT",verbose=verbose)
   }
-  gt<-gtt[,-c(1:3)]
+  gt<-gtt[,-c(1:4)]
   freq<-apply(gt,1,function(xx){aal<-unlist(strsplit(as.character(xx),"/"))
   return(length(which(aal=="1"))/(length(which(aal=="0"))+length(which(aal=="1"))))})
 
@@ -219,7 +218,7 @@ relatedness<-function(vcf,plot=TRUE,threshold=0.5,verbose=TRUE){
 #'  \item{QUAL: The Phred-scaled probability that a REF/ALT polymorphism exists
 #'   at this site given sequencing data}
 #'  \item{AC: Allele count}
-#'  \item{AF: Allele frequencey}
+#'  \item{AF: Allele frequency}
 #'  \item{DP: unfiltered depth}
 #'  \item{QD: QualByDepth - This is the variant confidence (from the QUAL
 #'  field) divided by the unfiltered depth of non-hom-ref samples}
@@ -270,7 +269,7 @@ vcf.stat<-function(vcf,plot=TRUE,...){
   if(plot){
     opars<-par(no.readonly = TRUE)
     on.exit(par(opars))
-    par(mfrow=c(4,3))
+    #par(mfrow=c(4,3))
     pl<-list(...)
     if(is.null(pl$col)) pl$col<-"lightblue"
     if(is.null(pl$border)) pl$border<-"firebrick"

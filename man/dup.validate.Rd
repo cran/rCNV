@@ -4,14 +4,17 @@
 \alias{dup.validate}
 \title{Validate detected duplicates}
 \usage{
-dup.validate(d.detect, window.size = 100)
+dup.validate(d.detect, window.size = 100, scaf.size = 10000)
 }
 \arguments{
-\item{d.detect}{a data frame of detected SNPs of duplicates and singlets
+\item{d.detect}{a data frame of detected duplicates or deviants from the outputs of \code{dupGet} or \code{cnv}
 (output of \code{dupGet})}
 
 \item{window.size}{numerical. a single value of the desired moving window
 size (default \code{100} bp)}
+
+\item{scaf.size}{numerical. scaffold size to be checked. i.e. the split size of the fragment to be checked with the specified window size.
+default=10000}
 }
 \value{
 A data frame of scaffold names and their average presence in the

@@ -1,50 +1,53 @@
 # helpers
 #1. get allele based p and chi-square values for all the samples
 get.pvals<-function(x,df,p.cal){
-  snp1<-df[x,-c(1:4)]
-  y<-data.frame(do.call(rbind,strsplit(as.character(unlist(snp1)),",")));y[,1]<-as.numeric(y[,1]);y[,2]<-as.numeric(y[,2])
-  rr1<-y[,2]/rowSums(y,na.rm = T)
-  snp1het<-y[-which(rr1 == 0 | rr1 == 1 | is.na(rr1)==T),]
-  homalt<-sum(rr1==1,na.rm=T)
-  homref<-sum(rr1==0,na.rm=T)
-  Nsamp=nrow(snp1het)+homalt+homref
-  if(nrow(snp1het)>3){
-    propHet<-nrow(na.omit(snp1het))/length(na.omit(rr1))
-    medRatio<-median(proportions(as.matrix(snp1het),margin = 1)[,2],na.rm = T)
+  snp1<-unlist(df[x,-c(1:4)])
+  y<-data.frame(stringr::str_split_fixed(snp1,",",n=2L))
+  y[,1]<-as.integer(y[,1]);y[,2]<-as.integer(y[,2])
+  rr1<-y[,2]/rowSums(y,na.rm = TRUE)
+  snp1het<-y[-which(rr1 == 0L | rr1 == 1L | is.na(rr1)==TRUE),]
+  homalt<-sum(rr1==1L,na.rm=TRUE)
+  homref<-sum(rr1==0L,na.rm=TRUE)
+  NHet<-nrow(na.omit(snp1het))
+  Nsamp <- NHet+homalt+homref
+  if(NHet>3L){
+    propHet<-NHet/length(na.omit(rr1))
+    medRatio<-median(proportions(as.matrix(snp1het),margin = 1)[,2],na.rm = TRUE)
     p.sum<-p.cal[x,2]
     p.05<-0.5
     p.all<-p.cal[x,1]
-    n<-unname(rowSums(snp1het,na.rm = T))
-    chi.het<-sum((n*p.sum-snp1het[,2])^2/(n*p.sum),na.rm = T)
+    n<-unname(rowSums(snp1het,na.rm = TRUE))
+
+    chi.het<-sum((((n*p.sum)-snp1het[,2])^2L/n*p.sum)+(((n*(1L-p.sum))-snp1het[,1])^2L/n*(1L-p.sum)),na.rm = TRUE)
     chi.het.sum<-chi.het
-    chi.05<-sum((n*p.05-snp1het[,2])^2/(n*p.05),na.rm = T)
-    chi.0.5.sum<-chi.05
-    chi.all<-sum((n*p.all-snp1het[,2])^2/(n*p.all))
+    chi.05<-sum((((n*p.05)-snp1het[,2])^2L/n*p.05)+(((n*(1L-p.05))-snp1het[,1])^2L/n*(1L-p.05)),na.rm = TRUE)
+    chi.05.sum<-chi.05
+    chi.all<-sum((((n*p.all)-snp1het[,2])^2L/n*p.all)+(((n*(1L-p.all))-snp1het[,1])^2L/n*(1L-p.all)),na.rm = TRUE)
     chi.all.sum<-chi.all
-    z <- (n*p.sum-snp1het[,2])/sqrt(n*p.sum*(1-p.sum))
-    z.het.sum<-sum(z,na.rm = T)
-    z<-pnorm(sum(z,na.rm = T),0,sqrt(nrow(snp1het)))
-    z.05 <- (n*p.05-snp1het[,2])/sqrt(n*p.05*(1-p.05))
-    z.05.sum<-sum(z.05,na.rm = T)
-    z.05<-pnorm(sum(z.05,na.rm = T),0,sqrt(nrow(snp1het)))
-    z.all<- (n*p.all-snp1het[,2])/sqrt(n*p.all*(1-p.all))
-    z.all.sum<-sum(z.all,na.rm = T)
-    z.all<-pnorm(sum(z.all,na.rm = T),0,sqrt(nrow(snp1het)))
-    ll<-data.frame(NHet=nrow(snp1het),propHet,medRatio,NHomRef=homref,NHomAlt=homalt,propHomAlt=homalt/Nsamp,Nsamp,
-                   pAll=p.all,pHet=p.sum,fis=1-(nrow(snp1het)/(2*(homref+(nrow(snp1het)/2))*(homalt+(nrow(snp1het)/2)))),
-                   z.het=ifelse(z>0.5, (1-z)*2, z*2),
-                   z.05=ifelse(z.05>0.5, (1-z.05)*2, z.05*2),
-                   z.all=ifelse(z.all>0.5, (1-z.all)*2, z.all*2),
-                   chi.het=pchisq(chi.het,nrow(snp1het)-1,lower.tail=F),
-                   chi.05=pchisq(chi.05,nrow(snp1het)-1,lower.tail = F),
-                   chi.all=pchisq(chi.all,nrow(snp1het)-1,lower.tail = F),
-                   z.het.sum,z.05.sum,z.all.sum,chi.het.sum,chi.0.5.sum,chi.all.sum)
+
+    z <- (n*p.sum-snp1het[,2])/sqrt(n*p.sum*(1L-p.sum))
+    z.het.sum<-sum(z,na.rm = TRUE)
+    z<-pnorm(z.het.sum,0,sqrt(NHet))
+    z.05 <- (n*p.05-snp1het[,2])/sqrt(n*p.05*(1L-p.05))
+    z.05.sum<-sum(z.05,na.rm = TRUE)
+    z.05<-pnorm(z.05.sum,0,sqrt(NHet))
+    z.all<- (n*p.all-snp1het[,2])/sqrt(n*p.all*(1L-p.all))
+    z.all.sum<-sum(z.all,na.rm = TRUE)
+    z.all<-pnorm(z.all.sum,0,sqrt(NHet))
+    ll<-data.frame(NHet=NHet,propHet,medRatio,NHomRef=homref,NHomAlt=homalt,propHomAlt=homalt/Nsamp,Nsamp,
+                   pAll=p.all,pHet=p.sum,fis=1L-(NHet/(2L*(homref+(NHet/2L))*(homalt+(NHet/2L)))),
+                   z.het=ifelse(z>0.5, (1L-z)*2L, z*2L),
+                   z.05=ifelse(z.05>0.5, (1L-z.05)*2L, z.05*2L),
+                   z.all=ifelse(z.all>0.5, (1L-z.all)*2L, z.all*2L),
+                   chi.het=pchisq(chi.het,NHet-1L,lower.tail=F),
+                   chi.05=pchisq(chi.05,NHet-1L,lower.tail = F),
+                   chi.all=pchisq(chi.all,NHet-1L,lower.tail = F),
+                   z.het.sum,z.05.sum,z.all.sum,chi.het.sum,chi.05.sum,chi.all.sum)
   } else {
     ll<-NA
   }
   return(ll)
 }
-
 
 
 #' Get allele information for duplicate detection
@@ -78,14 +81,14 @@ get.pvals<-function(x,df,p.cal){
 #'  proportion of heterozygotes, number of samples, and deviation of allele
 #'  detection from a 1:1 ratio of reference and alternative alleles.
 #'  The significance of the deviation is tested with Z-score test
-#'  \eqn{Z =\frac{\frac{N}{2}-N_{A}}{\sigma_{x}}},
+#'  \eqn{Z = \frac{ \frac{N}{2}-N_A}{ \sigma_{x}}},
 #'  and chi-square test (see references for more details on the method).
 #'
 #' @return Returns a data frame of median allele ratio, proportion of
 #' heterozygotes, number of heterozygotes, and allele probability at different
 #'  assumptions with their chi-square significance
 #'
-#' @author Piyal Karunarathne, Pascal Milesi, Qiujie Zhou
+#' @author Piyal Karunarathne, Pascal Milesi, Klaus Schliep
 #'
 #' @references
 #' \itemize{
@@ -101,29 +104,37 @@ get.pvals<-function(x,df,p.cal){
 #' AI<-allele.info(ADtable,x.norm=ADnorm)}
 #'
 #' @export
-allele.info<-function(X,x.norm=NULL,method=c("TMM", "TMMex"),logratioTrim = 0.3,sumTrim = 0.05,Weighting = TRUE,Acutoff = -1e+10,plot.allele.cov=TRUE,verbose = TRUE,...){
-  if(!is.list(x.norm)){x.norm<-list(AD=x.norm)}
-  if(is.list(x.norm)){x.norm<-x.norm$AD}
+allele.info<-function(X,x.norm=NULL,method=c("TMM","TMMex","MedR","QN","pca"),logratioTrim = 0.3,sumTrim = 0.05,Weighting = TRUE,Acutoff = -1e+10,plot.allele.cov=TRUE,verbose = TRUE,...){
   method=match.arg(method)
   if(is.null(x.norm)){
     x.norm<-cpm.normal(X,method=method,logratioTrim=logratioTrim,sumTrim = sumTrim,Weighting = Weighting,Acutoff = Acutoff,verbose = verbose)
   }
+  if(!inherits(x.norm,"list")){x.norm<-list(AD=x.norm)}
+  if(inherits(x.norm,"list")){x.norm<-x.norm$AD}
+
   if(verbose){
     message("calculating probability values of alleles")
     p.cal<-apply_pb(x.norm[,-c(1:4)],1,function(snp1){
-      y<-data.frame(do.call(rbind,strsplit(as.character(snp1),",")));y[,1]<-as.numeric(y[,1]);y[,2]<-as.numeric(y[,2])
-      rr1<-y[,2]/rowSums(y)
-      snp1het<-y[-which(rr1 == 0 | rr1 == 1 | is.na(rr1)==T),]
-      homalt<-sum(rr1==1,na.rm=T)
-      homref<-sum(rr1==0,na.rm=T)
-      covrefhomo<-sum(y[c(rr1 == 0,na.rm = T),],na.rm = T)
-      covalthomo<-sum(y[c(rr1 == 1,na.rm = T),],na.rm = T)
-      covalt<-sum(y[,2])
-      covref<-sum(y[,1])
-      if(nrow(snp1het)>3){
-        p.all<-(colSums(y)[2]/(nrow(snp1het)+(2*homalt)))/((colSums(y)[2]/(nrow(snp1het)+(2*homalt)))+(colSums(y)[1]/(nrow(snp1het)+(2*homref))))
+      if(is.character(unname(unlist(snp1[1])))){
+        y<-data.frame(stringr::str_split_fixed(snp1,",",n=2L))
+        y[,1]<-as.integer(y[,1])
+        y[,2]<-as.integer(y[,2])} else {y<-snp1}
+      rs<-rowSums(y)
+      rs[rs==0L]<-NA
+      cv<-sd(unlist(y),na.rm = TRUE)/mean(unlist(y),na.rm = TRUE)
+      rr1<-y[,2]/rs
+      snp1het<-y[-which(rr1 == 0 | rr1 == 1 | is.na(rr1)==TRUE),]
+      homalt<-sum(rr1==1,na.rm=TRUE)
+      homref<-sum(rr1==0,na.rm=TRUE)
+      covrefhomo<-sum(y[c(rr1 == 0,na.rm = TRUE),],na.rm = TRUE)
+      covalthomo<-sum(y[c(rr1 == 1,na.rm = TRUE),],na.rm = TRUE)
+      covalt<-sum(y[,2],na.rm = TRUE)
+      covref<-sum(y[,1],na.rm = TRUE)
+      NHet<-nrow(snp1het)
+      if(NHet>3){
+        p.all<-(covalt/(NHet+(2*homalt)))/((covalt/(NHet+(2*homalt)))+(covref/(NHet+(2*homref))))
         p.sum<-sum(snp1het[,2])/sum(snp1het)
-        ll <-data.frame(p.all,p.sum,mean.a.homo=covalthomo/(2*homalt),mean.r.homo=covrefhomo/(2*homref),mean.a.het=sum(snp1het[,2])/nrow(snp1het),mean.r.het=sum(snp1het[,1])/nrow(snp1het))
+        ll <-data.frame(p.all,p.sum,mean.a.homo=covalthomo/(2*homalt),mean.r.homo=covrefhomo/(2*homref),mean.a.het=sum(snp1het[,2])/NHet,mean.r.het=sum(snp1het[,1])/NHet,cv=cv)
       } else {
         ll<-NA
       }
@@ -131,19 +142,26 @@ allele.info<-function(X,x.norm=NULL,method=c("TMM", "TMMex"),logratioTrim = 0.3,
     })
   } else {
     p.cal<-apply(x.norm[,-c(1:4)],1,function(snp1){
-      y<-data.frame(do.call(rbind,strsplit(as.character(snp1),",")));y[,1]<-as.numeric(y[,1]);y[,2]<-as.numeric(y[,2])
-      rr1<-y[,2]/rowSums(y)
-      snp1het<-y[-which(rr1 == 0 | rr1 == 1 | is.na(rr1)==T),]
-      homalt<-sum(rr1==1,na.rm=T)
-      homref<-sum(rr1==0,na.rm=T)
-      covrefhomo<-sum(y[c(rr1 == 0,na.rm = T),],na.rm = T)
-      covalthomo<-sum(y[c(rr1 == 1,na.rm = T),],na.rm = T)
-      covalt<-sum(y[,2])
-      covref<-sum(y[,1])
-      if(nrow(snp1het)>3){
-        p.all<-(colSums(y)[2]/(nrow(snp1het)+(2*homalt)))/((colSums(y)[2]/(nrow(snp1het)+(2*homalt)))+(colSums(y)[1]/(nrow(snp1het)+(2*homref))))
+      if(is.character(unname(unlist(snp1[1])))){
+        y<-data.frame(stringr::str_split_fixed(snp1,",",n=2L))
+        y[,1]<-as.integer(y[,1])
+        y[,2]<-as.integer(y[,2])} else {y<-snp1}
+      rs<-rowSums(y)
+      rs[rs==0]<-NA
+      cv<-sd(unlist(y),na.rm = TRUE)/mean(unlist(y),na.rm = TRUE)
+      rr1<-y[,2]/rs
+      snp1het<-y[-which(rr1 == 0 | rr1 == 1 | is.na(rr1)==TRUE),]
+      homalt<-sum(rr1==1,na.rm=TRUE)
+      homref<-sum(rr1==0,na.rm=TRUE)
+      covrefhomo<-sum(y[c(rr1 == 0,na.rm = TRUE),],na.rm = TRUE)
+      covalthomo<-sum(y[c(rr1 == 1,na.rm = TRUE),],na.rm = TRUE)
+      covalt<-sum(y[,2],na.rm = TRUE)
+      covref<-sum(y[,1],na.rm = TRUE)
+      NHet<-nrow(snp1het)
+      if(NHet>3){
+        p.all<-(covalt/(NHet+(2*homalt)))/((covalt/(NHet+(2*homalt)))+(covref/(NHet+(2*homref))))
         p.sum<-sum(snp1het[,2])/sum(snp1het)
-        ll <-data.frame(p.all,p.sum,mean.a.homo=covalthomo/(2*homalt),mean.r.homo=covrefhomo/(2*homref),mean.a.het=sum(snp1het[,2])/nrow(snp1het),mean.r.het=sum(snp1het[,1])/nrow(snp1het))
+        ll <-data.frame(p.all,p.sum,mean.a.homo=covalthomo/(2*homalt),mean.r.homo=covrefhomo/(2*homref),mean.a.het=sum(snp1het[,2])/NHet,mean.r.het=sum(snp1het[,1])/NHet,cv=cv)
       } else {
         ll<-NA
       }
@@ -155,7 +173,7 @@ allele.info<-function(X,x.norm=NULL,method=c("TMM", "TMMex"),logratioTrim = 0.3,
   } else {
     p.cal<-t(p.cal)
   }
-
+  p.cal[p.cal=="NaN"]<-0
   if(plot.allele.cov){
     p.list<-list(...)
     if(is.null(p.list$pch)) p.list$pch=19
@@ -164,13 +182,21 @@ allele.info<-function(X,x.norm=NULL,method=c("TMM", "TMMex"),logratioTrim = 0.3,
     if(is.null(p.list$lcol)) p.list$lcol="tomato"
     par(mfrow=c(2,2))
     par(mar=c(4,5,2,2))
-    plot(p.cal$mean.a.homo,p.cal$mean.r.homo,pch=p.list$pch,cex=p.list$cex,col=p.list$col,xlab="Mean coverage of \nalt. allele in homozygotes",ylab="Mean coverage of \n ref. allele in homozygotes",cex.lab=0.8)
+    plot(p.cal$mean.a.homo,p.cal$mean.r.homo,pch=p.list$pch,cex=p.list$cex,
+         col=p.list$col,xlab="Mean coverage of \nalt. allele in homozygotes",
+         ylab="Mean coverage of \n ref. allele in homozygotes",cex.lab=0.8)
     abline(0,1,col=p.list$lcol)
-    plot(p.cal$mean.a.het,p.cal$mean.r.het,pch=p.list$pch,cex=p.list$cex,col=p.list$col,xlab="Mean coverage of \nalt. allele in heterozygotes",ylab="Mean coverage of \n ref. allele in heterozygotes",cex.lab=0.8)
+    plot(p.cal$mean.a.het,p.cal$mean.r.het,pch=p.list$pch,cex=p.list$cex,
+         col=p.list$col,xlab="Mean coverage of \nalt. allele in heterozygotes",
+         ylab="Mean coverage of \n ref. allele in heterozygotes",cex.lab=0.8)
     abline(0,1,col=p.list$lcol)
-    plot(p.cal$mean.a.het,p.cal$mean.a.homo,pch=p.list$pch,cex=p.list$cex,col=p.list$col,xlab="Mean coverage of \nalt. allele in heterozygotes",ylab="Mean coverage of \n alt. allele in homozygotes",cex.lab=0.8)
+    plot(p.cal$mean.a.het,p.cal$mean.a.homo,pch=p.list$pch,cex=p.list$cex,
+         col=p.list$col,xlab="Mean coverage of \nalt. allele in heterozygotes",
+         ylab="Mean coverage of \n alt. allele in homozygotes",cex.lab=0.8)
     abline(0,1,col=p.list$lcol)
-    plot(p.cal$mean.r.het,p.cal$mean.r.homo,pch=p.list$pch,cex=p.list$cex,col=p.list$col,xlab="Mean coverage of \nref. allele in heterozygotes",ylab="Mean coverage of \n ref. allele in homozygotes",cex.lab=0.8)
+    plot(p.cal$mean.r.het,p.cal$mean.r.homo,pch=p.list$pch,cex=p.list$cex,
+         col=p.list$col,xlab="Mean coverage of \nref. allele in heterozygotes",
+         ylab="Mean coverage of \n ref. allele in homozygotes",cex.lab=0.8)
     abline(0,1,col=p.list$lcol)
     par(mfrow=c(1,1))
   }
@@ -184,6 +210,9 @@ allele.info<-function(X,x.norm=NULL,method=c("TMM", "TMMex"),logratioTrim = 0.3,
   pvals<-do.call(rbind,pvals)
   pvals<-cbind(X[,1:3],pvals)
   pvals<-na.omit(pvals)
+  ht<-sig.hets(pvals,plot = FALSE, verbose = verbose)
+  pvals<-data.frame(pvals,eH.pval=ht[,"eH.pval"],eH.delta=ht[,"eH.delta"],cv=na.omit(p.cal[,"cv"]))
+
   return(pvals)
 }
 
