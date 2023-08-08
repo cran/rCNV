@@ -8,6 +8,7 @@ cnv(
   data,
   test = c("z.het", "z.05", "z.all", "chi.het", "chi.05", "chi.all"),
   filter = c("intersection", "kmeans"),
+  WGS = TRUE,
   ft.threshold = 0.05,
   plot = TRUE,
   verbose = TRUE,
@@ -23,6 +24,12 @@ See details}
 
 \item{filter}{character. Type of filter to be used for filtering CNVs.
 default \code{kmeans}. See details.}
+
+\item{WGS}{logical. test parameter. See details
+\code{WGS} is a test parameter to include or exclude coefficient of variance
+(cv) in kmeans. For data sets with more homogeneous depth distribution,
+excluding cv improves CNV detection. If you're not certain about this, use
+\code{TRUE} which is the default.}
 
 \item{ft.threshold}{confidence interval for filtering \code{default = 0.05}}
 
