@@ -7,18 +7,21 @@
 hetTgen(
   vcf,
   info.type = c("AD", "AD-tot", "GT", "GT-012", "GT-AB", "DP"),
-  verbose = TRUE
+  verbose = TRUE,
+  parallel = FALSE
 )
 }
 \arguments{
 \item{vcf}{an imported vcf file in a list using \code{readVCF}}
 
-\item{info.type}{character. \code{AD}: allele depth value, {AD-tot}:total
+\item{info.type}{character. \code{AD}: allele depth value, \code{AD-tot}:total
 allele depth, \code{DP}=unfiltered depth (sum), \code{GT}: genotype,
 \code{GT-012}:genotype in 012 format, \code{GT-AB}:genotype in AB format.
 Default \code{AD},  See details.}
 
 \item{verbose}{logical. whether to show the progress of the analysis}
+
+\item{parallel}{logical. whether to parallelize the process}
 }
 \value{
 Returns a data frame of allele depth, genotype of SNPs for all the
@@ -37,9 +40,9 @@ For info.type \code{GT} option is provided to extract the genotypes of
 individuals by snp.
 }
 \examples{
-vcf.file.path <- paste0(path.package("rCNV"), "/example.raw.vcf.gz")
+\dontrun{vcf.file.path <- paste0(path.package("rCNV"), "/example.raw.vcf.gz")
 vcf <- readVCF(vcf.file.path=vcf.file.path)
-het.table<-hetTgen(vcf)
+het.table<-hetTgen(vcf)}
 
 }
 \author{

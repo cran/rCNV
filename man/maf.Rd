@@ -4,7 +4,7 @@
 \alias{maf}
 \title{Remove MAF allele}
 \usage{
-maf(h.table, AD = TRUE, verbose = TRUE)
+maf(h.table, AD = TRUE, verbose = TRUE, parallel = FALSE)
 }
 \arguments{
 \item{h.table}{allele depth table generated from the function \code{hetTgen}}
@@ -14,6 +14,8 @@ output will be returns; If \code{FALSE}, individual AD values per SNP will be
 returned in a list.}
 
 \item{verbose}{logical. Show progress}
+
+\item{parallel}{logical. whether to parallelize the process}
 }
 \value{
 A data frame or a list of minimum allele frequency removed allele depth

@@ -8,26 +8,58 @@ wind<-function(xx,dd){
   tmp[,2]
 }
 
-#' Validate detected duplicates
+#' Validate detected deviants/cnvs
 #'
-#' This function will validate the detected duplicated-SNPs using a moving
+#' This function will validate the detected duplicated-SNPs (deviants/cnvs) using a moving
 #' window approach (see details)
 #'
 #' @param d.detect a data frame of detected duplicates or deviants from the outputs of \code{dupGet} or \code{cnv}
-#'  (output of \code{dupGet})
+#'
 #' @param window.size numerical. a single value of the desired moving window
 #'  size (default \code{100} bp)
-#' @param scaf.size numerical. scaffold size to be checked. i.e. the split size of the fragment to be checked with the specified window size.
+#' @param scaf.size numerical. scaffold size to be checked. i.e. the chromosome/scaffolds will be split into equal pieces of this size
 #' default=10000
 #'
-#' @details Chromosome positions correctly ordered according to a reference
-#' sequence is necessary for this function to work properly. Therefore, this
-#' function is still in development for non-mapped reference sequences.
+#' @details Loci/SNP positions correctly ordered according to a reference
+#' sequence is necessary for this function to work properly. The list of deviants/cnvs provided in the \code{d.detect} will be split into pices of \code{scaf.size} and the number of deviants/cnvs will be counted along each split with a moving window of \code{window.size}. The resulting percentages of deviants/cnvs will be averaged for each scaf.size split; this is the \code{cnv.ratio} column in the output. Thus, ideally, the \code{cnv.ratio} is a measure of how confident the detected deviants/cnvs are in an actual putative duplicated region withing the given \code{scaf.size}. This ratio is sensitive to the picked window size and the scaf.size; as a rule of thumb, it is always good to use a known gene length as the scaf.size, if you need to check a specific gene for the validity of the detected duplicates.
+#' Please also note that this function is still in its \code{beta-testing} phase and also under development for non-mapped reference sequences. Therefore, your feedback and suggestions will be highly appreciated.
 #'
-#' @return A data frame of scaffold names and their average presence in the
-#' scaffold.
+#' @return A data frame of deviant/cnv ratios (column \code{cnv.ratio}) for a split of the chromosome/scaffold given by the \code{scaf.size}; this ratio is an average value of the percentage of deviants/cnvs present within the given \code{window.size} for each split (\code{chromosome/scaffold length/sacf.size}); the start and the end positions of each split is given in the \code{start} and \code{end} columns
 #'
 #' @author Piyal Karunarathne
+#'
+#' @examples
+#' \dontrun{
+#' # suggestion to visualize dup.validate output
+#'
+#' library(ggplot2)
+#' library(dplyr)
+#'
+#' dvs<-dupGet(alleleINF,test=c("z.05","chi.05"))
+#' dvd<-dup.validate(dvs,window.size = 1000)
+#'
+#' # Example data frame
+#' df <- data.frame(dvd[,3:5])
+#' df$cnv.ratio<-as.numeric(df$cnv.ratio)
+#'
+#' # Calculate midpoints
+#' df <- df %>%
+#'   mutate(midpoint = (start + end) / 2)
+#'
+#' ggplot() +
+#'   # Horizontal segments for each start-end range
+#'   geom_segment(data = df, aes(x = start, xend = end,
+#'   y = cnv.ratio, yend = cnv.ratio), color = "blue") +
+#'   # Midpoints line connecting midpoints of each range
+#'   geom_path(data = df, aes(x = midpoint, y = cnv.ratio), color = "red") +
+#'   geom_point(data = df, aes(x = midpoint, y = cnv.ratio), color = "red") +
+#'   # Aesthetic adjustments
+#'   theme_minimal() +
+#'   labs(title = "CNV Ratio along a Continuous Axis with Midpoint Fluctuation",
+#'       x = "Genomic Position",
+#'        y = "CNV Ratio")
+#' }
+#'
 #'
 #' @export
 dup.validate<-function(d.detect,window.size=100, scaf.size=10000){
@@ -35,6 +67,7 @@ dup.validate<-function(d.detect,window.size=100, scaf.size=10000){
   gg<-lapply(nm,wind,dd=d.detect)
   names(gg)<-nm
   means<-lapply_pb(nm,function(x,mw,gg){yy<-unlist(gg[names(gg)==x])
+
   ll<-mw+(mw/2)
   if(length(yy)>ll){
     if(length(yy)>2*scaf.size){
@@ -71,13 +104,24 @@ dup.validate<-function(d.detect,window.size=100, scaf.size=10000){
     dp<-sum(yy=="cnv" | yy=="deviant")/(sum(yy=="cnv" | yy=="deviant")+sum(yy=="non-cnv" | yy=="non-deviant"))
     dp<-cbind(x,dp,length(yy),sum(yy=="cnv" | yy=="deviant"),sum(yy=="non-cnv" | yy=="non-deviant"))
   }
+
+  dp<-data.frame(dp)
+  start_positions <- seq(1, length(yy), by = scaf.size) # validate ranges start
+  end_positions <- pmin(start_positions + scaf.size - 1, length(yy)) # validate ranges end
+  dp$start<-start_positions
+  dp$end<-end_positions
+
   return(dp)
   },mw=window.size,gg=gg)
-  dup.ratio<-do.call(rbind,means)
+  if(is.list(means)){dup.ratio<-do.call(rbind,means)}else{dup.ratio<-data.frame(means)}
+  #dup.ratio[,1]<-nm
   dup.ratio[dup.ratio=="NaN"]<-0
-  colnames(dup.ratio)<-c("CHROM","dp.ratio","CHROM.length","no.duplicates","no.singlets")
+  dup.ratio<-data.frame(dup.ratio[,1],dup.ratio[,3],dup.ratio[,6:7],dup.ratio[,c(2,4:5)])
+  colnames(dup.ratio)<-c("CHROM","Chr.length","start","end","cnv.ratio","cnvs","non.cnvs")
+  dup.ratio$cnv.ratio<-as.numeric(dup.ratio$cnv.ratio)
   return(data.frame(dup.ratio))
 }
+
 
 #' Calculate population-wise Vst
 #'
@@ -120,7 +164,7 @@ dup.validate<-function(d.detect,window.size=100, scaf.size=10000){
 #' \dontrun{data(alleleINF)
 #' data(ADtable)
 #' DD<-dupGet(alleleINF)
-#' ds<-DD[DD$dup.stat=="duplicated",]
+#' ds<-DD[DD$dup.stat=="deviant",]
 #' ad<-ADtable[match(paste0(ds$CHROM,".",ds$POS),paste0(ADtable$CHROM,".",ADtable$POS)),]
 #' vst(ad,pops=substr(colnames(ad)[-c(1:4)],1,11))}
 #'
@@ -183,5 +227,77 @@ vst<-function(AD,pops,id.list=NULL,qGraph=TRUE,verbose=TRUE,...){
 }
 
 
+#' Run permutation on Vst
+#'
+#' This function runs a permutation test on Vst calculation
+#'
+#' @param AD data frame of total allele depth values of SNPs
+#' @param pops character. A vector of population names for each individual.
+#' Must be the same length as the number of samples in AD
+#' @param nperm numeric. Number of permutations to perform
+#' @param qGraph logical. Plot the network plot based on observed Vst values
+#' (see \code{vst()} help page for more details)
+#' @param histogram logical. plots the distribution histogram of permuted vst values vs. observed values
+#' @param stat numeric. The stat to be plotted in histogram. 1 for Mean Absolute Distance or 2 (\code{default}) for Root Mean Square Distance
+#'
+#' @importFrom qgraph qgraph
+#' @importFrom graphics hist
+#' @importFrom stats as.dist
+#'
+#' @return Returns a list with observed vst values, an array of permuted vst values and the p-values for the permutation test
+#'
+#'
+#' @author Jorge Cortés-Miranda (email:<jorge.cortes.m@ug.uchile.cl>), Piyal Karunarathne
+#'
+#' @examples
+#' \dontrun{data(alleleINF)
+#' data(ADtable)
+#' DD<-dupGet(alleleINF)
+#' ds<-DD[DD$dup.stat=="deviant",]
+#' ad<-ADtable[match(paste0(ds$CHROM,".",ds$POS),paste0(ADtable$CHROM,".",ADtable$POS)),]
+#' vstPermutation(ad,pops=substr(colnames(ad)[-c(1:4)],1,11))}
+#'
+#' @export
+vstPermutation<-function(AD,pops,nperm=100,histogram=TRUE,stat=2,qGraph=TRUE){
+  npop<-length(unique(pops))
+  message("Permuting Vst")
+  perm_vst<-sapply_pb(1:nperm,function(x){
+    ind_cnv <- AD[-1:-4]
+    ind_test <- sample(ind_cnv, size = length(ind_cnv), replace = F)
+    dd_test <- cbind(AD[1:4], ind_test)
+    Vs_sim <-  vst(dd_test, pops= pops, qGraph = FALSE,verbose = FALSE)
+  },simplify="array")
+
+  message("Calculating ovserved Vst")
+  obs_vst<-vst(AD, pops, qGraph = qGraph,verbose = TRUE)
+
+  out_mat<-matrix(0, nrow = npop, ncol = npop)
+  h_dat<-data.frame(matrix(NA,ncol=2,nrow=nperm))
+  for(i in 1:nperm){
+    matrix1=perm_vst[,,i]
+    comparison_matrix <- matrix(0, nrow = nrow(matrix1), ncol = ncol(matrix1))
+    comparison_matrix[!is.na(matrix1) & !is.na(obs_vst)] <- as.numeric(matrix1[!is.na(matrix1)] > obs_vst[!is.na(obs_vst)])
+    out_mat<-out_mat+comparison_matrix
+    h_dat[i,1]<-mean(abs(matrix1), na.rm = TRUE)
+    h_dat[i,2]<-sqrt(mean(matrix1^2, na.rm = TRUE))
+  }
+  p_mat<-out_mat/nperm
+  colnames(p_mat)<-colnames(obs_vst)
+  rownames(p_mat)<-rownames(obs_vst)
+  p_mat<-as.dist(p_mat)
+
+  if(histogram){
+    #stat<-1
+    ob_stat<-c(mean(abs(obs_vst), na.rm = TRUE),sqrt(mean(obs_vst^2, na.rm = TRUE)))
+    xlims<-range(h_dat[,stat],ob_stat[stat],ifelse(ob_stat[stat]>0,(ob_stat[stat]+ob_stat[stat]/10),(ob_stat[stat]-(ob_stat[stat]/10))))
+    hist(h_dat[,stat], main = "Vst Permutation Test Histogram",
+         xlab = "VST", ylab = "Frequency",xlim = xlims,
+         col = "dodgerblue", border ="dodgerblue" )
+    abline(v = ob_stat[stat], col = 2, lwd = 2)
+    legend("bottomright", legend = c("Observed Vst", "Permutation Vst"),
+           col = c(2, "dodgerblue"), lwd = 2, bty="n",xpd=TRUE, horiz=TRUE,inset=c(0,1),cex=0.8)
+  }
+  return(list(observed_vst=obs_vst,permuted_vst=perm_vst,pvalue=p_mat))
+}
 
 
